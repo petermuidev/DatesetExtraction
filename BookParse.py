@@ -119,3 +119,119 @@ for chunk in token_chunks:
 # Write responses to a JSON file
 with open('responses.json', 'w') as f:
     json.dump(responses, f)
+
+
+'''
+Here's the complete rewritten code using OpenAI's ChatGPT API and the `tiktoken` library for tokenization:
+
+```python
+import PyPDF2
+import json
+import openai
+import re
+from tiktoken import Tokenizer
+from tiktoken.tokenizer import TokenizerException
+
+# Set your API key
+openai.api_key = "your-api-key-here"
+
+tokenizer = Tokenizer()
+
+command = "You are an API that converts bodies of text into a single question and answer in JSON format. Each JSON "\
+          "contains a single question with a single answer. Only respond with the JSON and no additional text.\n"
+
+def run(user_input):
+    prompt = f"{command} {user_input}"
+    
+    response = openai.Completion.create(
+        engine="text-davinci-codex-002",
+        prompt=prompt,
+        max_tokens=100,
+        n=1,
+        stop=None,
+        temperature=0.7,
+        top_p=0.1
+    )
+
+    result = response.choices[0].text.strip()
+    return result
+
+def extract_text_from_pdf(file_path):
+    pdf_file_obj = open(file_path, 'rb')
+    pdf_reader = PyPDF2.PdfReader(pdf_file_obj)
+    text = ''
+    for page_num in range(len(pdf_reader.pages)):
+        page_obj = pdf_reader.pages[page_num]
+        text += page_obj.extract_text()
+    pdf_file_obj.close()
+    return text
+
+def tokenize(text):
+    try:
+        tokens = tokenizer.tokenize(text)
+        return tokens
+    except TokenizerException as e:
+        print(f"Error tokenizing: {e}")
+        return []
+
+def chunks(lst, n):
+    result = []
+    current_chunk = []
+    current_size = 0
+    for token in lst:
+        current_chunk.append(token)
+        current_size += len(token)
+        if current_size >= n:
+            result.append(" ".join(current_chunk))
+            current_chunk = []
+            current_size = 0
+    if current_chunk:
+        result.append(" ".join(current_chunk))
+    return result
+
+def is_json(data):
+    try:
+        json.loads(data)
+        return True
+    except ValueError:
+        return False
+
+def submit_to_api(chunk, retries=3):
+    for i in range(retries):
+        try:
+            response = run(chunk.strip())
+            if is_json(response):
+                print(response)
+                return json.loads(response)
+            else:
+                match = re.search(r'`(.*?)`', response, re.S)
+                if match and is_json(match.group(1)):
+                    print(f"Attempt {i + 1} failed. Retrying...")
+                    return json.loads(match.group(1))
+                else:
+                    print(f"Request failed: {e}")
+        except Exception as e:
+            continue
+    print("Max retries exceeded. Skipping this chunk.")
+    return None
+
+text = extract_text_from_pdf('D\\20000-Leagues-Under-the-Sea.pdf')
+tokens = tokenize(text)
+
+token_chunks = chunks(tokens, 256)
+
+responses = []
+
+for chunk in token_chunks:
+    response = submit_to_api(chunk)
+    if response is not None:
+        responses.append(response)
+
+# Write responses to a JSON file
+with open('responses.json', 'w') as f:
+    json.dump(responses, f)
+```
+
+This code now uses OpenAI's ChatGPT API for generating responses and the `tiktoken` library for tokenization. Be sure to replace `"your-api-key-here"` with your actual OpenAI API key.
+
+'''
